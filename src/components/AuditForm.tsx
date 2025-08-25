@@ -52,64 +52,75 @@ export const AuditForm = ({ onStartAudit, onAuditComplete }: AuditFormProps) => 
     onStartAudit();
 
     try {
-      // TODO: Replace with actual API call to Supabase Edge Function
-      // This will call the AI agents once Supabase is connected
-      await new Promise(resolve => setTimeout(resolve, 3000)); // Simulate API call
+      const { supabase } = await import("@/integrations/supabase/client");
       
-      // Mock audit results for demo
-      const mockResults = {
-        overall_score: 78,
-        website_url: websiteUrl,
-        social_url: socialUrl,
+      const response = await supabase.functions.invoke('website-audit', {
+        body: {
+          website_url: websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`,
+          social_url: socialUrl || null,
+          email: email || null
+        }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      const { results } = response.data;
+      
+      // Transform the AI results to match the expected UI format
+      const transformedResults = {
+        overall_score: results.overall_score || 50,
+        website_url: results.website_url,
+        social_url: results.social_url,
         business_summary: {
-          score: 85,
-          insights: "Strong brand positioning in the tech space with clear value proposition.",
-          recommendations: ["Clarify target audience in hero section", "Add social proof testimonials"]
+          score: results.agents?.business?.authority_score || 50,
+          insights: results.agents?.business?.key_insights?.[0] || "Business analysis completed",
+          recommendations: results.agents?.business?.key_insights || ["Review business positioning"]
         },
         style_alignment: {
-          score: 72,
-          insights: "Brand style is modern but could better reflect professional expertise.",
-          recommendations: ["Update color scheme for more authority", "Improve typography hierarchy"]
+          score: results.agents?.style?.consistency_score || 50,
+          insights: results.agents?.style?.analysis || "Style analysis completed",
+          recommendations: results.agents?.style?.recommendations || ["Review brand consistency"]
         },
         hero_audit: {
-          score: 68,
-          insights: "Hero section lacks clarity and compelling call-to-action.",
-          recommendations: ["Rewrite headline for immediate clarity", "Strengthen primary CTA button"]
+          score: results.agents?.hero?.clarity_score || 50,
+          insights: results.agents?.hero?.analysis || "Hero section analyzed",
+          recommendations: results.agents?.hero?.improvements || ["Optimize hero section"]
         },
         problem_fit: {
-          score: 75,
-          insights: "Problem articulation is present but could be more specific.",
-          recommendations: ["Add pain point specificity", "Include customer problem examples"]
+          score: results.agents?.problem?.problem_clarity_score || 50,
+          insights: results.agents?.problem?.analysis || "Problem definition reviewed",
+          recommendations: results.agents?.problem?.suggestions || ["Clarify problem statement"]
         },
         copy_seo: {
-          score: 82,
-          insights: "SEO fundamentals are solid with room for content optimization.",
-          recommendations: ["Optimize meta descriptions", "Add more semantic keywords"]
+          score: results.agents?.seo?.seo_score || 50,
+          insights: results.agents?.seo?.analysis || "SEO analysis completed",
+          recommendations: results.agents?.seo?.optimizations || ["Implement SEO improvements"]
         },
         conversion_analysis: {
-          score: 70,
-          insights: "Several conversion barriers identified in user flow.",
-          recommendations: ["Reduce form friction", "Add trust signals", "Improve mobile CTA placement"]
+          score: results.agents?.conversion?.trust_score || 50,
+          insights: results.agents?.conversion?.analysis || "Conversion analysis completed",
+          recommendations: results.agents?.conversion?.barriers || ["Address conversion barriers"]
         },
         top_recommendations: [
-          "Clarify your hero headline for immediate impact",
-          "Add customer testimonials and trust badges",
-          "Optimize mobile call-to-action placement",
-          "Strengthen problem-solution messaging",
-          "Improve page loading speed"
-        ]
+          ...(results.agents?.hero?.improvements || []).slice(0, 2),
+          ...(results.agents?.conversion?.barriers || []).slice(0, 2),
+          ...(results.agents?.seo?.optimizations || []).slice(0, 1)
+        ].filter(Boolean).slice(0, 5) || ["Review and optimize your website"]
       };
 
-      onAuditComplete(mockResults);
+      onAuditComplete(transformedResults);
       
       toast({
         title: "Audit Complete!",
-        description: "Your website audit has been generated successfully.",
+        description: "Your AI website audit has been generated successfully.",
       });
     } catch (error) {
+      console.error('Audit error:', error);
       toast({
         title: "Audit Failed",
-        description: "Something went wrong. Please try again.",
+        description: error instanceof Error ? error.message : "Something went wrong. Please try again.",
         variant: "destructive",
       });
       setIsSubmitting(false);
