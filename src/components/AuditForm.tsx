@@ -66,48 +66,48 @@ export const AuditForm = ({ onStartAudit, onAuditComplete }: AuditFormProps) => 
         throw new Error(response.error.message);
       }
 
-      const { results } = response.data;
+      const auditData = response.data;
       
-      // Transform the AI results to match the expected UI format
+      // Transform the API response to match the expected UI format
       const transformedResults = {
-        overall_score: results.overall_score || 50,
-        website_url: results.website_url,
-        social_url: results.social_url,
+        overall_score: auditData.overallScore,
+        website_url: websiteUrl,
+        social_url: socialUrl,
         business_summary: {
-          score: results.agents?.business?.authority_score || 50,
-          insights: results.agents?.business?.key_insights?.[0] || "Business analysis completed",
-          recommendations: results.agents?.business?.key_insights || ["Review business positioning"]
+          score: auditData.auditResults.business.score,
+          insights: auditData.auditResults.business.insights,
+          recommendations: auditData.auditResults.business.recommendations
         },
         style_alignment: {
-          score: results.agents?.style?.consistency_score || 50,
-          insights: results.agents?.style?.analysis || "Style analysis completed",
-          recommendations: results.agents?.style?.recommendations || ["Review brand consistency"]
+          score: auditData.auditResults.style.score,
+          insights: auditData.auditResults.style.insights,
+          recommendations: auditData.auditResults.style.recommendations
         },
         hero_audit: {
-          score: results.agents?.hero?.clarity_score || 50,
-          insights: results.agents?.hero?.analysis || "Hero section analyzed",
-          recommendations: results.agents?.hero?.improvements || ["Optimize hero section"]
+          score: auditData.auditResults.hero.score,
+          insights: auditData.auditResults.hero.insights,
+          recommendations: auditData.auditResults.hero.recommendations
         },
         problem_fit: {
-          score: results.agents?.problem?.problem_clarity_score || 50,
-          insights: results.agents?.problem?.analysis || "Problem definition reviewed",
-          recommendations: results.agents?.problem?.suggestions || ["Clarify problem statement"]
+          score: auditData.auditResults.problem.score,
+          insights: auditData.auditResults.problem.insights,
+          recommendations: auditData.auditResults.problem.recommendations
         },
         copy_seo: {
-          score: results.agents?.seo?.seo_score || 50,
-          insights: results.agents?.seo?.analysis || "SEO analysis completed",
-          recommendations: results.agents?.seo?.optimizations || ["Implement SEO improvements"]
+          score: auditData.auditResults.seo.score,
+          insights: auditData.auditResults.seo.insights,
+          recommendations: auditData.auditResults.seo.recommendations
         },
         conversion_analysis: {
-          score: results.agents?.conversion?.trust_score || 50,
-          insights: results.agents?.conversion?.analysis || "Conversion analysis completed",
-          recommendations: results.agents?.conversion?.barriers || ["Address conversion barriers"]
+          score: auditData.auditResults.conversion.score,
+          insights: auditData.auditResults.conversion.insights,
+          recommendations: auditData.auditResults.conversion.recommendations
         },
         top_recommendations: [
-          ...(results.agents?.hero?.improvements || []).slice(0, 2),
-          ...(results.agents?.conversion?.barriers || []).slice(0, 2),
-          ...(results.agents?.seo?.optimizations || []).slice(0, 1)
-        ].filter(Boolean).slice(0, 5) || ["Review and optimize your website"]
+          ...auditData.auditResults.hero.recommendations.slice(0, 2),
+          ...auditData.auditResults.conversion.recommendations.slice(0, 2),
+          ...auditData.auditResults.seo.recommendations.slice(0, 1)
+        ].filter(Boolean).slice(0, 5)
       };
 
       onAuditComplete(transformedResults);
