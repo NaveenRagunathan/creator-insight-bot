@@ -158,6 +158,42 @@ export type Database = {
         }
         Relationships: []
       }
+      website_audits: {
+        Row: {
+          audit_results: Json
+          created_at: string
+          email: string | null
+          id: string
+          overall_score: number | null
+          social_url: string | null
+          status: string
+          updated_at: string
+          website_url: string
+        }
+        Insert: {
+          audit_results: Json
+          created_at?: string
+          email?: string | null
+          id?: string
+          overall_score?: number | null
+          social_url?: string | null
+          status?: string
+          updated_at?: string
+          website_url: string
+        }
+        Update: {
+          audit_results?: Json
+          created_at?: string
+          email?: string | null
+          id?: string
+          overall_score?: number | null
+          social_url?: string | null
+          status?: string
+          updated_at?: string
+          website_url?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
