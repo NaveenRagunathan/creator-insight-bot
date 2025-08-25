@@ -52,6 +52,16 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
+				success: {
+					DEFAULT: 'hsl(var(--success))',
+					foreground: 'hsl(var(--success-foreground))'
+				},
+				'score-excellent': 'hsl(var(--score-excellent))',
+				'score-good': 'hsl(var(--score-good))',
+				'score-warning': 'hsl(var(--score-warning))',
+				'score-critical': 'hsl(var(--score-critical))',
+				'agent-card': 'hsl(var(--agent-card))',
+				'progress-bg': 'hsl(var(--progress-bg))',
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
 					foreground: 'hsl(var(--sidebar-foreground))',
@@ -67,6 +77,15 @@ export default {
 				lg: 'var(--radius)',
 				md: 'calc(var(--radius) - 2px)',
 				sm: 'calc(var(--radius) - 4px)'
+			},
+			backgroundImage: {
+				'gradient-primary': 'var(--gradient-primary)',
+				'gradient-secondary': 'var(--gradient-secondary)',
+				'gradient-bg': 'var(--gradient-bg)'
+			},
+			boxShadow: {
+				'audit-glow': '0 0 40px hsl(var(--audit-glow))',
+				'card-glow': '0 4px 24px -4px hsl(var(--audit-glow))'
 			},
 			keyframes: {
 				'accordion-down': {
