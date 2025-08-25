@@ -53,65 +53,94 @@ export const AuditForm = ({ onStartAudit, onAuditComplete }: AuditFormProps) => 
 
     try {
       const { supabase } = await import("@/integrations/supabase/client");
-      
+
+      const payload = {
+        website_url: websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`,
+        social_url: socialUrl || null,
+        email: email || null
+      };
+
+      console.debug('[AuditForm] Invoking function with payload:', payload);
+
       const response = await supabase.functions.invoke('website-audit', {
-        body: {
-          website_url: websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`,
-          social_url: socialUrl || null,
-          email: email || null
-        }
+        body: payload
       });
 
+      console.debug('[AuditForm] Supabase function response:', response);
+
       if (response.error) {
-        throw new Error(response.error.message);
+        console.error('[AuditForm] Supabase function returned error:', response.error);
+        throw new Error(response.error.message || 'Function error');
       }
 
       const auditData = response.data;
-      
-      // Transform the API response to match the expected UI format
+      console.debug('[AuditForm] Received auditData:', auditData);
+
+      // Defensive parser: agent outputs sometimes arrive as JSON strings.
+      const safeParse = (maybe: any) => {
+        if (maybe === null || maybe === undefined) return maybe;
+        if (typeof maybe === "object") return maybe;
+        if (typeof maybe === "string") {
+          try {
+            return JSON.parse(maybe);
+          } catch {
+            // If not strict JSON, try to be lenient and return the original string.
+            return maybe;
+          }
+        }
+        return maybe;
+      };
+
+      const rawResults = auditData.auditResults || {};
+      const parsedResults: Record<string, any> = {};
+      Object.entries(rawResults).forEach(([key, val]) => {
+        parsedResults[key] = safeParse(val);
+      });
+
+      // Transform the API response to match the expected UI format (use parsedResults)
       const transformedResults = {
-        overall_score: auditData.overallScore,
+        overall_score: auditData.overallScore ?? 0,
         website_url: websiteUrl,
         social_url: socialUrl,
         business_summary: {
-          score: auditData.auditResults.business.score,
-          insights: auditData.auditResults.business.insights,
-          recommendations: auditData.auditResults.business.recommendations
+          score: parsedResults.business?.score ?? 0,
+          insights: parsedResults.business?.insights ?? [],
+          recommendations: parsedResults.business?.recommendations ?? []
         },
         style_alignment: {
-          score: auditData.auditResults.style.score,
-          insights: auditData.auditResults.style.insights,
-          recommendations: auditData.auditResults.style.recommendations
+          score: parsedResults.style?.score ?? 0,
+          insights: parsedResults.style?.insights ?? [],
+          recommendations: parsedResults.style?.recommendations ?? []
         },
         hero_audit: {
-          score: auditData.auditResults.hero.score,
-          insights: auditData.auditResults.hero.insights,
-          recommendations: auditData.auditResults.hero.recommendations
+          score: parsedResults.hero?.score ?? 0,
+          insights: parsedResults.hero?.insights ?? [],
+          recommendations: parsedResults.hero?.recommendations ?? []
         },
         problem_fit: {
-          score: auditData.auditResults.problem.score,
-          insights: auditData.auditResults.problem.insights,
-          recommendations: auditData.auditResults.problem.recommendations
+          score: parsedResults.problem?.score ?? 0,
+          insights: parsedResults.problem?.insights ?? [],
+          recommendations: parsedResults.problem?.recommendations ?? []
         },
         copy_seo: {
-          score: auditData.auditResults.seo.score,
-          insights: auditData.auditResults.seo.insights,
-          recommendations: auditData.auditResults.seo.recommendations
+          score: parsedResults.seo?.score ?? 0,
+          insights: parsedResults.seo?.insights ?? [],
+          recommendations: parsedResults.seo?.recommendations ?? []
         },
         conversion_analysis: {
-          score: auditData.auditResults.conversion.score,
-          insights: auditData.auditResults.conversion.insights,
-          recommendations: auditData.auditResults.conversion.recommendations
+          score: parsedResults.conversion?.score ?? 0,
+          insights: parsedResults.conversion?.insights ?? [],
+          recommendations: parsedResults.conversion?.recommendations ?? []
         },
         top_recommendations: [
-          ...auditData.auditResults.hero.recommendations.slice(0, 2),
-          ...auditData.auditResults.conversion.recommendations.slice(0, 2),
-          ...auditData.auditResults.seo.recommendations.slice(0, 1)
+          ...(parsedResults.hero?.recommendations ?? []).slice(0, 2),
+          ...(parsedResults.conversion?.recommendations ?? []).slice(0, 2),
+          ...(parsedResults.seo?.recommendations ?? []).slice(0, 1)
         ].filter(Boolean).slice(0, 5)
       };
 
       onAuditComplete(transformedResults);
-      
+
       toast({
         title: "Audit Complete!",
         description: "Your AI website audit has been generated successfully.",
@@ -123,6 +152,7 @@ export const AuditForm = ({ onStartAudit, onAuditComplete }: AuditFormProps) => 
         description: error instanceof Error ? error.message : "Something went wrong. Please try again.",
         variant: "destructive",
       });
+    } finally {
       setIsSubmitting(false);
     }
   };

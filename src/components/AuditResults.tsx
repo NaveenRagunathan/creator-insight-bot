@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ interface AuditResultsProps {
 }
 
 export const AuditResults = ({ data, onNewAudit }: AuditResultsProps) => {
+  const [activeTab, setActiveTab] = useState<number | "all">("all");
   const getScoreColor = (score: number) => {
     if (score >= 80) return "text-score-excellent";
     if (score >= 60) return "text-score-good";
@@ -77,6 +79,9 @@ export const AuditResults = ({ data, onNewAudit }: AuditResultsProps) => {
     }
   ];
 
+  // determine agents to show based on tab
+  const displayedAgents = activeTab === "all" ? agents : [agents[activeTab as number]];
+
   return (
     <div className="min-h-screen py-16 px-4">
       <div className="container mx-auto max-w-6xl">
@@ -120,9 +125,22 @@ export const AuditResults = ({ data, onNewAudit }: AuditResultsProps) => {
           </div>
         </div>
 
+        {/* Tabs / Nav */}
+        <div className="flex gap-3 justify-center mb-8 flex-wrap">
+          <Button variant={activeTab === "all" ? undefined : "ghost"} size="sm" onClick={() => setActiveTab("all")}>All</Button>
+          {agents.map((a, i) => (
+            <Button key={a.name} variant={activeTab === i ? undefined : "ghost"} size="sm" onClick={() => setActiveTab(i)}>
+              <div className="flex items-center gap-2">
+                {a.icon}
+                <span className="hidden sm:inline">{a.name}</span>
+              </div>
+            </Button>
+          ))}
+        </div>
+
         {/* Agent Analysis Grid */}
-        <div className="grid lg:grid-cols-2 gap-6 mb-12">
-          {agents.map((agent, index) => (
+        <div className={`grid ${activeTab === "all" ? "lg:grid-cols-2" : "grid-cols-1"} gap-6 mb-12`}>
+          {displayedAgents.map((agent, index) => (
             <Card key={index} className="bg-agent-card border border-border shadow-card-glow">
               <CardHeader>
                 <CardTitle className="flex items-center gap-3">
@@ -130,9 +148,9 @@ export const AuditResults = ({ data, onNewAudit }: AuditResultsProps) => {
                   <div>
                     <div className="flex items-center gap-3">
                       {agent.name}
-                      {getScoreIcon(agent.data.score)}
-                      <Badge variant="outline" className={getScoreColor(agent.data.score)}>
-                        {agent.data.score}/100
+                      {getScoreIcon(agent.data?.score ?? 0)}
+                      <Badge variant="outline" className={getScoreColor(agent.data?.score ?? 0)}>
+                        {agent.data?.score ?? 0}/100
                       </Badge>
                     </div>
                   </div>
@@ -140,22 +158,37 @@ export const AuditResults = ({ data, onNewAudit }: AuditResultsProps) => {
                 <CardDescription>{agent.description}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Progress value={agent.data.score} className="h-2" />
+                <Progress value={agent.data?.score ?? 0} className="h-2" />
                 
                 <div>
                   <h4 className="font-semibold mb-2">Key Insights</h4>
-                  <p className="text-sm text-muted-foreground">{agent.data.insights}</p>
+                  {Array.isArray(agent.data?.insights) ? (
+                    <ul className="text-sm space-y-1">
+                      {agent.data.insights.map((ins: any, idx: number) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0" />
+                          <span className="text-muted-foreground">{String(ins)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{String(agent.data?.insights ?? "")}</p>
+                  )}
                 </div>
                 
                 <div>
                   <h4 className="font-semibold mb-2">Recommendations</h4>
                   <ul className="text-sm space-y-1">
-                    {agent.data.recommendations.map((rec: string, idx: number) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0"></div>
-                        <span className="text-muted-foreground">{rec}</span>
-                      </li>
-                    ))}
+                    {Array.isArray(agent.data?.recommendations) ? (
+                      agent.data.recommendations.map((rec: any, idx: number) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0"></div>
+                          <span className="text-muted-foreground">{String(rec)}</span>
+                        </li>
+                      ))
+                    ) : (
+                      <li className="text-muted-foreground">{String(agent.data?.recommendations ?? "")}</li>
+                    )}
                   </ul>
                 </div>
               </CardContent>
