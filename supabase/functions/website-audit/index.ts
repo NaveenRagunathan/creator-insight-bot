@@ -5,6 +5,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.56.0';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 const mistralApiKey = Deno.env.get('MISTRAL_API_KEY');
@@ -245,8 +246,14 @@ async function scrapeSocialProfile(url: string) {
 }
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { 
+      headers: {
+        ...corsHeaders,
+        'Access-Control-Max-Age': '86400',
+      }
+    });
   }
 
   try {
@@ -315,23 +322,26 @@ serve(async (req) => {
     };
 
     // Run all agents in parallel
-    const agentResults = await Promise.all([
+    // Run all agents in parallel with timeout
+    const agentPromises = [
       callMistralAgent(agents.business.prompt, agents.business.input),
       callMistralAgent(agents.style.prompt, agents.style.input),
       callMistralAgent(agents.hero.prompt, agents.hero.input),
       callMistralAgent(agents.problem.prompt, agents.problem.input),
       callMistralAgent(agents.seo.prompt, agents.seo.input),
       callMistralAgent(agents.conversion.prompt, agents.conversion.input)
-    ]);
+    ];
+
+    const agentResults = await Promise.all(agentPromises);
 
     // Compile results - matching frontend data structure
     const auditResults = {
-      business_summary: agentResults[0],
-      style_alignment: agentResults[1], 
-      hero_audit: agentResults[2],
-      problem_fit: agentResults[3],
-      copy_seo: agentResults[4],
-      conversion_analysis: agentResults[5],
+      business: agentResults[0],
+      style: agentResults[1], 
+      hero: agentResults[2],
+      problem: agentResults[3],
+      seo: agentResults[4],
+      conversion: agentResults[5],
       websiteData,
       socialData,
       timestamp: new Date().toISOString()
@@ -368,11 +378,12 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       id: auditRecord.id,
-      overall_score: overallScore,
+      overallScore: overallScore,
+      auditResults: auditResults,
       website_url: website_url,
-      ...auditResults,
       status: 'completed'
     }), {
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
