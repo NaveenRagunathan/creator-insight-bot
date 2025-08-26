@@ -162,34 +162,50 @@ export const AuditResults = ({ data, onNewAudit }: AuditResultsProps) => {
                 
                 <div>
                   <h4 className="font-semibold mb-2">Key Insights</h4>
-                  {Array.isArray(agent.data?.insights) ? (
-                    <ul className="text-sm space-y-1">
-                      {agent.data.insights.map((ins: any, idx: number) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0" />
-                          <span className="text-muted-foreground">{String(ins)}</span>
-                        </li>
-                      ))}
-                    </ul>
+                  {agent.data?.insights ? (
+                    Array.isArray(agent.data.insights) ? (
+                      <ul className="text-sm space-y-2">
+                        {agent.data.insights.map((insight: any, idx: number) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0" />
+                            <span className="text-muted-foreground leading-relaxed">{String(insight)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="text-sm text-muted-foreground leading-relaxed">
+                        {String(agent.data.insights).split('\n').map((line, idx) => (
+                          <p key={idx} className="mb-1">{line}</p>
+                        ))}
+                      </div>
+                    )
                   ) : (
-                    <p className="text-sm text-muted-foreground">{String(agent.data?.insights ?? "")}</p>
+                    <p className="text-sm text-muted-foreground italic">No insights available</p>
                   )}
                 </div>
                 
                 <div>
                   <h4 className="font-semibold mb-2">Recommendations</h4>
-                  <ul className="text-sm space-y-1">
-                    {Array.isArray(agent.data?.recommendations) ? (
-                      agent.data.recommendations.map((rec: any, idx: number) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0"></div>
-                          <span className="text-muted-foreground">{String(rec)}</span>
-                        </li>
-                      ))
+                  {agent.data?.recommendations ? (
+                    Array.isArray(agent.data.recommendations) ? (
+                      <ul className="text-sm space-y-2">
+                        {agent.data.recommendations.map((rec: any, idx: number) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <div className="w-1.5 h-1.5 bg-accent rounded-full mt-2 flex-shrink-0"></div>
+                            <span className="text-muted-foreground leading-relaxed">{String(rec)}</span>
+                          </li>
+                        ))}
+                      </ul>
                     ) : (
-                      <li className="text-muted-foreground">{String(agent.data?.recommendations ?? "")}</li>
-                    )}
-                  </ul>
+                      <div className="text-sm text-muted-foreground leading-relaxed">
+                        {String(agent.data.recommendations).split('\n').map((line, idx) => (
+                          <p key={idx} className="mb-1">{line}</p>
+                        ))}
+                      </div>
+                    )
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic">No recommendations available</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
