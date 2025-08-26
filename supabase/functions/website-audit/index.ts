@@ -27,7 +27,12 @@ interface AgentResult {
 }
 
 async function callMistralAgent(systemPrompt: string, input: string): Promise<AgentResult> {
+  const timeoutMs = 5000; // 5 second timeout per agent
+  
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    
     const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -35,37 +40,34 @@ async function callMistralAgent(systemPrompt: string, input: string): Promise<Ag
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'mistral-small-latest', // Using smaller model to avoid capacity issues
+        model: 'mistral-small-latest',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: input }
         ],
         temperature: 0.3,
-        max_tokens: 800,
+        max_tokens: 400, // Reduced for faster response
       }),
+      signal: controller.signal
     });
 
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Mistral API error:', errorText);
-      
-      // Enhanced fallback based on the prompt type
+      console.error('Mistral API error:', response.status);
       return generateSmartFallback(systemPrompt, input);
     }
 
     const data = await response.json();
     const content = data.choices[0].message.content;
     
-    // Parse JSON response from AI
     try {
       const parsed = JSON.parse(content);
-      // Validate the structure
       if (typeof parsed.score === 'number' && Array.isArray(parsed.insights) && Array.isArray(parsed.recommendations)) {
         return parsed;
       }
       throw new Error('Invalid structure');
     } catch {
-      // Enhanced fallback parsing
       return generateSmartFallback(systemPrompt, input, content);
     }
   } catch (error) {
@@ -75,10 +77,9 @@ async function callMistralAgent(systemPrompt: string, input: string): Promise<Ag
 }
 
 function generateSmartFallback(systemPrompt: string, input: string, content?: string): AgentResult {
-  // Determine agent type from system prompt
   const agentType = systemPrompt.toLowerCase();
   
-  if (agentType.includes('business analyst')) {
+  if (agentType.includes('business')) {
     return {
       score: 75,
       insights: [
@@ -92,7 +93,7 @@ function generateSmartFallback(systemPrompt: string, input: string, content?: st
         "Define target audience more specifically"
       ]
     };
-  } else if (agentType.includes('brand and style')) {
+  } else if (agentType.includes('style')) {
     return {
       score: 70,
       insights: [
@@ -106,7 +107,7 @@ function generateSmartFallback(systemPrompt: string, input: string, content?: st
         "Add brand elements to build recognition"
       ]
     };
-  } else if (agentType.includes('landing page conversion')) {
+  } else if (agentType.includes('hero')) {
     return {
       score: 65,
       insights: [
@@ -120,7 +121,7 @@ function generateSmartFallback(systemPrompt: string, input: string, content?: st
         "Test different headline variations"
       ]
     };
-  } else if (agentType.includes('problem articulation')) {
+  } else if (agentType.includes('problem')) {
     return {
       score: 68,
       insights: [
@@ -134,7 +135,7 @@ function generateSmartFallback(systemPrompt: string, input: string, content?: st
         "Connect problem to solution more directly"
       ]
     };
-  } else if (agentType.includes('seo and copywriting')) {
+  } else if (agentType.includes('seo')) {
     return {
       score: 72,
       insights: [
@@ -148,7 +149,7 @@ function generateSmartFallback(systemPrompt: string, input: string, content?: st
         "Add more relevant internal links"
       ]
     };
-  } else if (agentType.includes('conversion rate optimization')) {
+  } else if (agentType.includes('conversion')) {
     return {
       score: 66,
       insights: [
@@ -173,12 +174,20 @@ function generateSmartFallback(systemPrompt: string, input: string, content?: st
 }
 
 async function scrapeWebsite(url: string) {
+  const timeoutMs = 8000; // 8 second timeout for scraping
+  
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; WebsiteAuditor/1.0)'
-      }
+      },
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
     
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
@@ -191,9 +200,9 @@ async function scrapeWebsite(url: string) {
     const metaDescMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
     const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
     
-    // Extract hero section (first 1000 chars after body)
+    // Extract hero section (first 600 chars after body)
     const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-    const heroSection = bodyMatch ? bodyMatch[1].substring(0, 1000) : '';
+    const heroSection = bodyMatch ? bodyMatch[1].substring(0, 600) : '';
     
     // Extract visible text (basic cleanup)
     const textContent = html
@@ -202,14 +211,14 @@ async function scrapeWebsite(url: string) {
       .replace(/<[^>]+>/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
-      .substring(0, 3000);
+      .substring(0, 1500); // Reduced for faster processing
 
     return {
-      title: titleMatch ? titleMatch[1] : '',
-      metaDescription: metaDescMatch ? metaDescMatch[1] : '',
-      h1: h1Match ? h1Match[1] : '',
-      heroSection,
-      textContent,
+      title: titleMatch ? titleMatch[1].trim() : '',
+      metaDescription: metaDescMatch ? metaDescMatch[1].trim() : '',
+      h1: h1Match ? h1Match[1].trim() : '',
+      heroSection: heroSection.trim(),
+      textContent: textContent.trim(),
       url
     };
   } catch (error) {
@@ -225,26 +234,6 @@ async function scrapeWebsite(url: string) {
   }
 }
 
-async function scrapeSocialProfile(url: string) {
-  if (!url) return { bio: '', followers: 0, style: 'professional' };
-  
-  try {
-    const response = await fetch(url);
-    const html = await response.text();
-    
-    // Basic extraction - this is simplified
-    const bioMatch = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i);
-    
-    return {
-      bio: bioMatch ? bioMatch[1] : '',
-      followers: 0,
-      style: 'professional'
-    };
-  } catch {
-    return { bio: '', followers: 0, style: 'professional' };
-  }
-}
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -257,6 +246,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log('Starting audit...');
+    
     const { website_url, social_url, email }: AuditRequest = await req.json();
     
     if (!website_url) {
@@ -287,42 +278,44 @@ serve(async (req) => {
       });
     }
 
-    // Scrape website and social profile
-    const [websiteData, socialData] = await Promise.all([
-      scrapeWebsite(website_url),
-      scrapeSocialProfile(social_url || '')
-    ]);
+    console.log('Created audit record:', auditRecord.id);
 
-    // Define AI agents with their prompts
+    // Scrape website (skip social for speed)
+    const websiteData = await scrapeWebsite(website_url);
+    const socialData = { bio: '', followers: 0, style: 'professional' };
+    
+    console.log('Scraped website, starting AI analysis...');
+
+    // Define simplified agents with shorter prompts
     const agents = {
       business: {
-        prompt: `You are a business analyst. Analyze the website and social profile data to understand the business model, target audience, and positioning. Return a JSON object with: {"score": number (0-100), "insights": [string array], "recommendations": [string array]}`,
-        input: `Website: ${JSON.stringify(websiteData)}\nSocial: ${JSON.stringify(socialData)}`
+        prompt: `Analyze business model. Return JSON: {"score": number (0-100), "insights": [string array], "recommendations": [string array]}`,
+        input: `Website: ${websiteData.title}. Content: ${websiteData.textContent.substring(0, 500)}`
       },
       style: {
-        prompt: `You are a brand and style expert. Analyze how well the website's visual style and messaging align with the creator's online persona. Return a JSON object with: {"score": number (0-100), "insights": [string array], "recommendations": [string array]}`,
-        input: `Website: ${JSON.stringify(websiteData)}\nSocial: ${JSON.stringify(socialData)}`
+        prompt: `Analyze brand style. Return JSON: {"score": number (0-100), "insights": [string array], "recommendations": [string array]}`,
+        input: `Title: ${websiteData.title}. Content: ${websiteData.textContent.substring(0, 500)}`
       },
       hero: {
-        prompt: `You are a landing page conversion expert. Analyze the hero section for clarity, compelling headline, and strong CTA. Check the "5-second clarity rule". Return a JSON object with: {"score": number (0-100), "insights": [string array], "recommendations": [string array]}`,
-        input: `Hero Section: ${websiteData.heroSection}\nTitle: ${websiteData.title}\nH1: ${websiteData.h1}`
+        prompt: `Analyze hero section. Return JSON: {"score": number (0-100), "insights": [string array], "recommendations": [string array]}`,
+        input: `Hero: ${websiteData.heroSection}. Title: ${websiteData.title}. H1: ${websiteData.h1}`
       },
       problem: {
-        prompt: `You are a problem articulation expert. Analyze how clearly the website communicates the user's problem and pain points. Check for jargon vs user-friendly messaging. Return a JSON object with: {"score": number (0-100), "insights": [string array], "recommendations": [string array]}`,
-        input: `Website Content: ${websiteData.textContent}`
+        prompt: `Analyze problem articulation. Return JSON: {"score": number (0-100), "insights": [string array], "recommendations": [string array]}`,
+        input: `Content: ${websiteData.textContent.substring(0, 700)}`
       },
       seo: {
-        prompt: `You are an SEO and copywriting expert. Analyze page titles, H1 tags, meta descriptions, and copy quality for SEO and persuasiveness. Return a JSON object with: {"score": number (0-100), "insights": [string array], "recommendations": [string array]}`,
-        input: `Title: ${websiteData.title}\nMeta Description: ${websiteData.metaDescription}\nH1: ${websiteData.h1}\nContent: ${websiteData.textContent.substring(0, 1500)}`
+        prompt: `Analyze SEO. Return JSON: {"score": number (0-100), "insights": [string array], "recommendations": [string array]}`,
+        input: `Title: ${websiteData.title}. Meta: ${websiteData.metaDescription}. H1: ${websiteData.h1}`
       },
       conversion: {
-        prompt: `You are a conversion rate optimization expert. Analyze potential barriers to conversion including trust signals, CTA placement, form design, and user friction points. Return a JSON object with: {"score": number (0-100), "insights": [string array], "recommendations": [string array]}`,
-        input: `Website Content: ${websiteData.textContent}\nHero: ${websiteData.heroSection}`
+        prompt: `Analyze conversion. Return JSON: {"score": number (0-100), "insights": [string array], "recommendations": [string array]}`,
+        input: `Hero: ${websiteData.heroSection}. Content: ${websiteData.textContent.substring(0, 500)}`
       }
     };
 
-    // Run all agents in parallel
-    // Run all agents in parallel with timeout
+    // Run all agents in parallel with timeout protection
+    console.log('Running AI agents...');
     const agentPromises = [
       callMistralAgent(agents.business.prompt, agents.business.input),
       callMistralAgent(agents.style.prompt, agents.style.input),
@@ -333,8 +326,9 @@ serve(async (req) => {
     ];
 
     const agentResults = await Promise.all(agentPromises);
+    console.log('AI analysis complete');
 
-    // Compile results - matching frontend data structure
+    // Compile results
     const auditResults = {
       business: agentResults[0],
       style: agentResults[1], 
@@ -347,7 +341,7 @@ serve(async (req) => {
       timestamp: new Date().toISOString()
     };
 
-    // Generate top recommendations from all agents
+    // Generate top recommendations
     const allRecommendations = agentResults
       .filter(result => Array.isArray(result.recommendations))
       .flatMap(result => result.recommendations)
@@ -362,7 +356,7 @@ serve(async (req) => {
       agentResults.reduce((sum, result) => sum + result.score, 0) / agentResults.length
     );
 
-    // Update audit record with results
+    // Update audit record
     const { error: updateError } = await supabase
       .from('website_audits')
       .update({
@@ -375,6 +369,8 @@ serve(async (req) => {
     if (updateError) {
       console.error('Update error:', updateError);
     }
+
+    console.log('Audit completed successfully');
 
     return new Response(JSON.stringify({
       id: auditRecord.id,
@@ -389,7 +385,10 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in website-audit function:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+    return new Response(JSON.stringify({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
